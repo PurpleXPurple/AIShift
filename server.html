@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dataset Labeler</title>
+    <style>
+        :root {
+            --bg: #121212; --paper: #1e1e1e; --ink: #f5f1ea; --ink-soft: #a0a0a0;
+            --accent: #e86a52; --green: #4ade80; --line: #333333; --radius: 10px;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--ink);
+            min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 2rem 1rem;
+        }
+        h1 { font-weight: 900; margin-bottom: 0.5rem; font-family: Georgia, serif; }
+        p { color: var(--ink-soft); margin-bottom: 2rem; text-align: center; }
+        .card {
+            background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius);
+            padding: 1.5rem; width: 100%; max-width: 600px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        textarea {
+            width: 100%; min-height: 150px; padding: 1rem; border: 1px solid var(--line);
+            border-radius: 8px; background: var(--bg); color: var(--ink); font-family: inherit;
+            resize: vertical; font-size: 1rem; margin-bottom: 1rem;
+        }
+        textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+        .btn-group { display: flex; gap: 1rem; margin-top: 1rem; }
+        button {
+            flex: 1; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--line);
+            font-weight: 600; cursor: pointer; transition: all 0.2s; font-size: 0.95rem;
+            background: var(--ink); color: var(--bg);
+        }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        button.ai { background: var(--accent); color: #fff; border-color: var(--accent); }
+        button.human { background: var(--green); color: #000; border-color: var(--green); }
+        
+        #status { margin-top: 1rem; text-align: center; font-size: 0.9rem; font-weight: 600; min-height: 1.2rem; }
+        .hidden { display: none !important; }
+        
+        .guess-box {
+            background: var(--bg); border: 1px solid var(--line); padding: 1rem;
+            border-radius: 8px; margin-bottom: 1rem; text-align: center;
+        }
+        .prob-num { font-size: 2rem; font-family: Georgia, serif; font-weight: 900; }
+    </style>
+</head>
+<body>
+
+    <h1>Dataset Labeler</h1>
+    <p>Paste text. The AI will guess. You confirm the truth.</p>
+
+    <div class="card" id="step1">
+        <textarea id="inputText" placeholder="Paste text here..."></textarea>
+        <button onclick="analyze()" id="analyzeBtn" style="width: 100%;">Analyze Text</button>
+    </div>
+
+    <div class="card hidden" id="step2">
+        <div class="guess-box">
+            <div style="color: var(--ink-soft); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">AI Guess</div>
+            <div class="prob-num" id="probNum">0%</div>
+            <div id="guessLabel" style="font-weight: 600;"></div>
+        </div>
+        <p style="margin-bottom: 1rem; margin-top: 0;">What is the actual label?</p>
+        <div class="btn-group">
+            <button class="human" onclick="save(0)">HUMAN</button>
+            <button class="ai" onclick="save(1)">AI</button>
+        </div>
+        <button onclick="reset()" style="width: 100%; margin-top: 0.5rem; background: transparent; color: var(--ink-soft); border: none; text-decoration: underline; font-size: 0.85rem;">Cancel / Skip</button>
+    </div>
+
+    <div id="status"></div>
+
+    <script>
+        let currentText = "";
+        let currentGuess = 0;
+
+        async function analyze() {
+            const text = document.getElementById('inputText').value.trim();
+            if (!text) return;
+
+            const btn = document.getElementById('analyzeBtn');
+            btn.disabled = true;
+            btn.textContent = "Analyzing...";
+            document.getElementById('status').textContent = "";
+
+            try {
+                const res = await fetch('/api/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+                const data = await res.json();
+                
+                currentText = text;
+                currentGuess = data.model_guess;
+                
+                document.getElementById('probNum').textContent = `${data.ai_probability}%`;
+                document.getElementById('guessLabel').textContent = currentGuess === 1 ? "Model thinks it's AI" : "Model thinks it's Human";
+                document.getElementById('guessLabel').style.color = currentGuess === 1 ? 'var(--accent)' : 'var(--green)';
+                
+                document.getElementById('step1').classList.add('hidden');
+                document.getElementById('step2').classList.remove('hidden');
+            } catch (e) {
+                document.getElementById('status').textContent = "Error connecting to server.";
+                document.getElementById('status').style.color = "var(--accent)";
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Analyze Text";
+            }
+        }
+
+        async function save(actualLabel) {
+            try {
+                await fetch('/api/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        text: currentText, 
+                        model_guess: currentGuess, 
+                        actual_label: actualLabel 
+                    })
+                });
+                
+                const status = document.getElementById('status');
+                status.textContent = "✅ Saved to dataset!";
+                status.style.color = "var(--green)";
+                
+                reset(true);
+            } catch (e) {
+                document.getElementById('status').textContent = "Failed to save.";
+                document.getElementById('status').style.color = "var(--accent)";
+            }
+        }
+
+        function reset(skipStatusClear = false) {
+            document.getElementById('inputText').value = "";
+            document.getElementById('step1').classList.remove('hidden');
+            document.getElementById('step2').classList.add('hidden');
+            if (!skipStatusClear) document.getElementById('status').textContent = "";
+        }
+    </script>
+</body>
+</html>

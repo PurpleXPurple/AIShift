@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AISniff — Honest AI Detection</title>
+
+    <style>
+        :root {
+            --bg: #f5f1ea; --ink: #1a1a1a; --ink-soft: #4a4a4a; --paper: #fffdf8;
+            --accent: #c8452b; --green: #2d6a4f; --yellow: #f4c95d; --line: #d9d2c5;
+            --shadow: 0 1px 0 rgba(0,0,0,0.04), 0 4px 20px rgba(0,0,0,0.06); --radius: 10px;
+        }
+        [data-theme="dark"] {
+            --bg: #121212; --ink: #f5f1ea; --ink-soft: #a0a0a0; --paper: #1e1e1e;
+            --accent: #e86a52; --green: #4ade80; --yellow: #fbbf24; --line: #333333;
+            --shadow: 0 1px 0 rgba(255,255,255,0.04), 0 4px 20px rgba(0,0,0,0.5);
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--ink);
+            min-height: 100vh; line-height: 1.6; transition: background 0.3s, color 0.3s;
+        }
+        h1, h2, h3 { font-family: 'Georgia', serif; font-weight: 900; letter-spacing: -0.02em; margin: 0; }
+        h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); line-height: 1.05; margin-bottom: 1rem; }
+        h2 { font-size: clamp(1.5rem, 3vw, 2rem); }
+        p { margin: 0 0 1rem; color: var(--ink-soft); }
+        code { font-family: monospace; background: var(--line); padding: 0.1rem 0.4rem; border-radius: 4px; color: var(--ink); }
+        
+        .shell { max-width: 1080px; margin: 0 auto; padding: 0 1.5rem; }
+        .nav { position: sticky; top: 0; z-index: 50; background: var(--bg); border-bottom: 1px solid var(--line); }
+        .nav-inner { display: flex; align-items: center; justify-content: space-between; padding: 1rem 0; }
+        .brand { font-family: 'Georgia', serif; font-weight: 900; font-size: 1.4rem; cursor: pointer; color: var(--ink); }
+        
+        .hero { padding: 4rem 0 2rem; }
+        .warn-inline { display: inline-flex; align-items: center; gap: 0.5rem; background: #fff3cd; border: 1px solid #f0d98a; color: #7a5b00; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 500; font-size: 0.9rem; margin-bottom: 1rem; }
+        
+        .card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem; margin-top: 1.5rem; }
+        .btn { font-family: inherit; font-weight: 600; font-size: 0.95rem; padding: 0.7rem 1.4rem; border-radius: 8px; cursor: pointer; border: 1px solid var(--ink); background: var(--ink); color: var(--bg); transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn.ghost { background: transparent; color: var(--ink); }
+        
+        textarea { width: 100%; min-height: 150px; padding: 1rem; border: 1px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 1rem; resize: vertical; background: var(--bg); color: var(--ink); }
+        textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+        
+        .prob-num { font-family: 'Georgia', serif; font-size: 3rem; font-weight: 900; line-height: 1; margin: 1rem 0; }
+        .prob-bar { height: 12px; background: var(--line); border-radius: 999px; overflow: hidden; margin-bottom: 1rem; }
+        .prob-fill { height: 100%; background: linear-gradient(90deg, var(--green), var(--yellow), var(--accent)); transition: width 1.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        
+        .review-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.2rem; margin-bottom: 1rem; }
+        .stars { color: var(--yellow); font-size: 1.1rem; letter-spacing: 2px; }
+        
+        .cookie { position: fixed; bottom: 1rem; left: 1rem; right: 1rem; max-width: 640px; margin: 0 auto; background: var(--ink); color: var(--bg); padding: 1.2rem; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 100; display: none; flex-direction: column; gap: 1rem; }
+        .cookie p { color: var(--bg); margin: 0; font-size: 0.95rem; opacity: 0.9; }
+        .cookie .actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+        .cookie .btn { background: var(--bg); color: var(--ink); border: none; }
+        .cookie .btn.ghost { background: transparent; color: var(--bg); border: 1px solid var(--line); }
+        
+        .form-group { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+        .form-group input, .form-group select { padding: 0.6rem; border: 1px solid var(--line); border-radius: 6px; font-family: inherit; background: var(--bg); color: var(--ink); }
+        
+        .error { color: var(--accent); font-weight: 600; font-size: 0.9rem; margin-top: 0.5rem; }
+        .spinner { width: 16px; height: 16px; border: 2px solid var(--bg); border-bottom-color: transparent; border-radius: 50%; display: inline-block; animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 200; padding: 1rem; }
+        .modal-content { background: var(--paper); padding: 2rem; border-radius: 12px; max-width: 800px; max-height: 85vh; overflow-y: auto; box-shadow: var(--shadow); }
+        .modal-content p, .modal-content li { font-size: 0.95rem; }
+        .modal-content h3 { margin-top: 1.5rem; font-family: system-ui; }
+        
+        .consent-group { display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1rem; padding: 1rem; background: var(--bg); border-radius: 8px; border: 1px solid var(--line); }
+        .consent-row { display: flex; gap: 0.75rem; align-items: flex-start; font-size: 0.9rem; cursor: pointer; }
+        .consent-row input { margin-top: 0.3rem; cursor: pointer; }
+        
+        .model-toggle { display: flex; gap: 1rem; margin-bottom: 1rem; background: var(--bg); padding: 0.5rem; border-radius: 8px; border: 1px solid var(--line); }
+        .model-toggle label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 500; padding: 0.4rem 0.8rem; border-radius: 6px; transition: background 0.2s; }
+        .model-toggle label:hover { background: var(--line); }
+        .model-toggle input[type="radio"] { accent-color: var(--accent); }
+
+        .benchmark-table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.9rem; }
+        .benchmark-table th, .benchmark-table td { border: 1px solid var(--line); padding: 0.75rem; text-align: left; }
+        .benchmark-table th { background: var(--bg); font-weight: 600; }
+        
+        .credits-box { background: var(--bg); border-left: 4px solid var(--accent); padding: 1rem; margin-top: 1rem; font-size: 0.95rem; border-radius: 0 8px 8px 0; }
+    </style>
+</head>
+<body>
+
+    <nav class="nav">
+        <div class="shell nav-inner">
+            <div class="brand" onclick="window.scrollTo(0,0)">A AISniff</div>
+            <button class="btn ghost" onclick="toggleTheme()">🌓 Theme</button>
+        </div>
+    </nav>
+
+    <div class="shell">
+        <section class="hero">
+            <h1 class="anim-fade">A toy that guesses <em style="color: var(--accent); font-style: normal;">whether your text smells like AI</em>.</h1>
+            <p style="font-size: 1.15rem; max-width: 640px;">AISniff runs local models. It reports a probability, not a verdict. Choose between the original open-source baseline or our custom fine-tuned model.</p>
+            <div class="warn-inline">⚠️ Entertainment, mirror, and sanity-check only. Not evidence.</div>
+        </section>
+
+        <section style="margin-bottom: 4rem;">
+            <div class="card">
+                <div class="model-toggle">
+                    <label>
+                        <input type="radio" name="model_choice" value="finetuned" checked>
+                        Custom Fine-Tuned (ViolentlyPurple)
+                    </label>
+                    <label>
+                        <input type="radio" name="model_choice" value="original">
+                        Original Baseline (akshayvkt)
+                    </label>
+                </div>
+
+                <textarea id="inputText" placeholder="Paste text here. The models read up to 64 tokens (approx 40 words)."></textarea>
+                
+                <div id="pasteWarning" style="display: none; background: #fff3cd; color: #7a5b00; padding: 1rem; border-radius: 8px; margin-top: 1rem; font-size: 0.9rem; border: 1px solid #f0d98a;"></div>
+                
+                <div class="consent-group">
+                    <label class="consent-row">
+                        <input type="checkbox" id="agreeTos">
+                        <span>I agree to the <a href="#" onclick="openModal('tos'); return false;" style="color: var(--accent);">Terms of Service</a>.</span>
+                    </label>
+                    <label class="consent-row">
+                        <input type="checkbox" id="consentDataset">
+                        <span><strong>Optional:</strong> Save this text to the open dataset. (If unchecked, text is discarded).</span>
+                    </label>
+                </div>
+
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem; align-items: center;">
+                    <button class="btn" id="analyzeBtn" onclick="analyze()">Analyze Text</button>
+                    <span id="charCount" style="font-size: 0.85rem; color: var(--ink-soft);">0 chars</span>
+                    <span id="errorMsg" class="error anim-shake" style="display: none;"></span>
+                </div>
+
+                <div id="resultBox" style="display: none; margin-top: 2rem; border-left: 4px solid var(--accent); padding-left: 1.5rem;" class="anim-slide">
+                    <h3>Estimated AI Probability</h3>
+                    <div class="prob-num" id="probNum">0%</div>
+                    <div class="prob-bar"><div class="prob-fill" id="probFill" style="width: 0%;"></div></div>
+                    <p id="resultText" style="font-size: 0.95rem;"></p>
+                    <div style="font-size: 0.85rem; color: var(--ink-soft);">Model Used: <code id="modelUsed"></code> · Raw Label: <code id="rawLabel"></code> · Confidence: <code id="rawScore"></code></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Documentation & Benchmarks -->
+        <section style="margin-bottom: 4rem;">
+            <h2>Model Documentation & Benchmarks</h2>
+            <p>The custom model was trained locally to fix the baseline's high false-positive rate on casual human writing, using a 34-case adversarial stress test.</p>
+            
+            <table class="benchmark-table">
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Original (Baseline)</th>
+                        <th>Custom Fine-Tuned (Ours)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Accuracy</td><td>67.65%</td><td><strong>94.12%</strong></td></tr>
+                    <tr><td>Precision</td><td>60.71%</td><td><strong>100.00%</strong></td></tr>
+                    <tr><td>Recall</td><td>100.00%</td><td>88.24%</td></tr>
+                    <tr><td>F1 Score</td><td>75.56%</td><td><strong>93.75%</strong></td></tr>
+                    <tr><td>Avg Latency</td><td>13.04 ms</td><td><strong>8.67 ms</strong></td></tr>
+                </tbody>
+            </table>
+
+            <div class="credits-box">
+                <strong>How this was built & Credits:</strong><br>
+                This model is officially open-sourced on Hugging Face: <a href="https://huggingface.co/ViolentlyPurple/Detect-AI/tree/main" target="_blank">ViolentlyPurple/Detect-AI</a>.<br><br>
+                It was fine-tuned completely on a local GTX 1050 Ti (ironic, but true). The pipeline involved parsing a 332k row CSV, balancing classes via <code>WeightedRandomSampler</code>, truncating sequences to 64 tokens, freezing the bottom 4 DistilBERT layers, and applying a custom weighted CrossEntropy loss to penalize false positives. You can replicate this by using the <code>finetune.py</code> script provided in the repository.<br><br>
+                <strong>Generated by:</strong> Deepseek 4.1 Flash, PurpleXPurple, Partnered with that original AI model.
+            </div>
+        </section>
+
+        <section style="margin-bottom: 4rem;">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h2 style="margin: 0;">Community Reviews</h2>
+                    <button class="btn ghost" id="toggleReviewBtn" onclick="toggleReviewForm()">Write a Review</button>
+                </div>
+
+                <form id="reviewForm" style="display: none; background: var(--bg); padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; border: 1px solid var(--line);">
+                    <div id="reviewError" class="error" style="display: none; margin-bottom: 1rem;"></div>
+                    <div class="form-group"><label>Name (optional)</label><input id="reviewName" placeholder="Anonymous" /></div>
+                    <div class="form-group"><label>Rating</label><select id="reviewRating"><option value="5">5 Stars</option><option value="4">4 Stars</option><option value="3">3 Stars</option><option value="2">2 Stars</option><option value="1">1 Star</option></select></div>
+                    <div class="form-group"><label>Review</label><textarea id="reviewText" rows="3" style="min-height: 80px;"></textarea></div>
+                    <button type="submit" class="btn" id="submitReviewBtn">Post Review</button>
+                </form>
+
+                <div id="reviewsList"></div>
+            </div>
+        </section>
+    </div>
+
+    <footer style="border-top: 1px solid var(--line); padding: 2rem 0; text-align: center; font-size: 0.9rem; color: var(--ink-soft);">
+        <div class="shell">
+            <p>Built with FastAPI + DistilBERT. Data processing is local.</p>
+            <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem;">
+                <button class="btn ghost" style="padding: 0.2rem 0.5rem;" onclick="openModal('tos')">Terms of Service</button>
+                <button class="btn ghost" style="padding: 0.2rem 0.5rem;" onclick="openModal('privacy')">Privacy Policy</button>
+            </div>
+        </div>
+    </footer>
+
+    <div id="modalOverlay" class="modal-overlay" onclick="closeModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h2 id="modalTitle" style="margin-bottom: 1rem;"></h2>
+            <div id="modalBody"></div>
+            <button class="btn" style="margin-top: 1.5rem;" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+
+    <div id="cookieBanner" class="cookie">
+        <p><strong>Cookies, honestly:</strong> We set one cookie to remember you clicked this. No analytics, no tracking.</p>
+        <div class="actions">
+            <button class="btn ghost" onclick="openModal('privacy')">Read Policy</button>
+            <button class="btn" onclick="acceptCookie()">Accept</button>
+        </div>
+    </div>
+
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+        function toggleTheme() {
+            const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+        }
+
+        function acceptCookie() {
+            document.cookie = "aisniff_consent=true; max-age=31536000; path=/; SameSite=Lax";
+            document.getElementById('cookieBanner').style.display = 'none';
+        }
+        if (!document.cookie.includes('aisniff_consent=true')) {
+            document.getElementById('cookieBanner').style.display = 'flex';
+        }
+
+        const workerCode = `
+            self.onmessage = async function(e) {
+                const challenge = e.data.challenge;
+                let nonce = 0;
+                async function sha256(str) {
+                    const buf = new TextEncoder().encode(str);
+                    const hash = await crypto.subtle.digest('SHA-256', buf);
+                    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+                }
+                while (true) {
+                    const hash = await sha256(challenge + nonce.toString());
+                    if (hash.startsWith("0000")) { self.postMessage({ nonce: nonce.toString() }); break; }
+                    nonce++;
+                }
+            };
+        `;
+        const workerUrl = URL.createObjectURL(new Blob([workerCode], { type: 'application/javascript' }));
+
+        async function solveCaptcha() {
+            const res = await fetch('/api/captcha');
+            const { challenge } = await res.json();
+            return new Promise((resolve) => {
+                const worker = new Worker(workerUrl);
+                worker.onmessage = (e) => { resolve({ challenge, nonce: e.data.nonce }); worker.terminate(); };
+                worker.postMessage({ challenge });
+            });
+        }
+
+        const inputText = document.getElementById('inputText');
+        const charCount = document.getElementById('charCount');
+        const pasteWarning = document.getElementById('pasteWarning');
+
+        inputText.addEventListener('input', () => {
+            charCount.textContent = `${inputText.value.length} chars`;
+            pasteWarning.style.display = 'none';
+        });
+
+        inputText.addEventListener('paste', (e) => {
+            const pasted = e.clipboardData.getData('text');
+            let warns = [];
+            if (/ignore (all|any|the) (previous|above|prior) instructions/i.test(pasted)) warns.push("Prompt-injection pattern.");
+            if (/[\u200B-\u200D\uFEFF]{3,}/.test(pasted)) warns.push("Invisible unicode.");
+            if (warns.length > 0) { pasteWarning.textContent = `🕵️ Paste Guard: ${warns.join(" ")}`; pasteWarning.style.display = 'block'; }
+        });
+
+        async function analyze() {
+            const btn = document.getElementById('analyzeBtn');
+            const err = document.getElementById('errorMsg');
+            const resultBox = document.getElementById('resultBox');
+            const agreeTos = document.getElementById('agreeTos').checked;
+            const consentDataset = document.getElementById('consentDataset').checked;
+            const modelChoice = document.querySelector('input[name="model_choice"]:checked').value;
+            
+            err.style.display = 'none';
+            resultBox.style.display = 'none';
+
+            if (!agreeTos) { err.textContent = "Agree to ToS first."; err.style.display = 'block'; return; }
+            if (!inputText.value.trim()) { err.textContent = "Paste text first."; err.style.display = 'block'; return; }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Solving CAPTCHA...';
+
+            try {
+                const { challenge, nonce } = await solveCaptcha();
+                btn.innerHTML = '<span class="spinner"></span> Analyzing...';
+
+                const fd = new FormData();
+                fd.append("text", inputText.value);
+                fd.append("consent_dataset", consentDataset);
+                fd.append("model_choice", modelChoice);
+                fd.append("captcha_challenge", challenge);
+                fd.append("captcha_nonce", nonce);
+
+                const res = await fetch('/api/detect', { method: 'POST', body: fd });
+                const data = await res.json();
+                
+                if (!res.ok) throw new Error(data.detail || "Server error");
+
+                document.getElementById('probNum').textContent = `${data.ai_probability}%`;
+                document.getElementById('probFill').style.width = `${data.ai_probability}%`;
+                document.getElementById('rawLabel').textContent = data.raw_label;
+                document.getElementById('rawScore').textContent = `${data.raw_score}%`;
+                document.getElementById('modelUsed').textContent = data.model_used === 'original' ? 'Original Baseline' : 'Custom Fine-Tuned';
+                
+                let msg = "Ambiguous. The model is not confident.";
+                if (data.ai_probability >= 85) msg = "The model thinks this leans AI-like."; 
+                else if (data.ai_probability < 65) msg = "The model thinks this leans human-written."; 
+                document.getElementById('resultText').textContent = msg;
+
+                resultBox.style.display = 'block';
+            } catch (e) {
+                err.textContent = e.message;
+                err.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Analyze Text';
+            }
+        }
+
+        async function loadReviews() {
+            try {
+                const res = await fetch('/api/reviews');
+                const data = await res.json();
+                const list = document.getElementById('reviewsList');
+                list.innerHTML = '';
+                
+                if (data.length === 0) { list.innerHTML = '<p>No reviews yet. Be the first.</p>'; return; }
+
+                data.forEach(r => {
+                    const div = document.createElement('div');
+                    div.className = 'review-card anim-fade';
+                    div.innerHTML = `
+                        <div class="stars">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</div>
+                        <div style="font-weight: 600; margin-top: 0.5rem;">${r.name}</div>
+                        <p style="margin-top: 0.5rem; margin-bottom: 0;">${r.text}</p>
+                        <div style="font-size: 0.85rem; color: var(--ink-soft); margin-top: 0.5rem;">${new Date(r.timestamp).toLocaleString()}</div>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        function toggleReviewForm() {
+            const form = document.getElementById('reviewForm');
+            const btn = document.getElementById('toggleReviewBtn');
+            const isHidden = form.style.display === 'none';
+            form.style.display = isHidden ? 'block' : 'none';
+            btn.textContent = isHidden ? 'Cancel' : 'Write a Review';
+        }
+
+        document.getElementById('reviewForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitReviewBtn');
+            const err = document.getElementById('reviewError');
+            const text = document.getElementById('reviewText').value;
+
+            err.style.display = 'none';
+            if (text.length < 5) { err.textContent = "Review too short."; err.style.display = 'block'; return; }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Posting...';
+
+            try {
+                const { challenge, nonce } = await solveCaptcha();
+                const fd = new FormData();
+                fd.append("name", document.getElementById('reviewName').value);
+                fd.append("rating", document.getElementById('reviewRating').value);
+                fd.append("text", text);
+                fd.append("captcha_challenge", challenge);
+                fd.append("captcha_nonce", nonce);
+
+                const res = await fetch('/api/reviews', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || "Failed to post");
+
+                document.getElementById('reviewForm').reset();
+                toggleReviewForm();
+                loadReviews();
+            } catch (e) {
+                err.textContent = e.message;
+                err.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Post Review';
+            }
+        });
+
+        const tosHTML = `
+            <h3>1. Open Source License</h3>
+            <p>The custom fine-tuned model (ViolentlyPurple/Detect-AI) is completely open-source. You are free to use, modify, distribute, and build upon it for any purpose, commercial or non-commercial. The code for this website is also open-source.</p>
+            
+            <h3>2. No Warranty</h3>
+            <p>The outputs generated by these models are probabilistic and inherently flawed. They do not constitute professional advice. The creators are not liable for any damages arising from the use of this tool.</p>
+
+            <h3>3. How it was built</h3>
+            <p>Trained locally on a GTX 1050 Ti using a 332k row dataset, <code>WeightedRandomSampler</code> for class balance, freezing the bottom 4 layers, and applying a custom weighted loss function.</p>
+
+            <h3>4. Credits</h3>
+            <p>Generated by: Deepseek 4.1 Flash, PurpleXPurple, Partnered with that original AI model.</p>
+        `;
+
+        const privacyHTML = `
+            <h3>1. Data Collection</h3>
+            <p>We do not track you. If you do not check the dataset consent box, your text is processed in memory by the local Python server and immediately destroyed.</p>
+            <h3>2. Cookies</h3>
+            <p>We use a single functional cookie (<code>aisniff_consent</code>) to remember if you dismissed the banner.</p>
+            <h3>3. Captcha and Security</h3>
+            <p>To prevent spam, we use a local Proof-of-Work Captcha. No third-party services are used.</p>
+        `;
+
+        function openModal(type) {
+            const overlay = document.getElementById('modalOverlay');
+            const title = document.getElementById('modalTitle');
+            const body = document.getElementById('modalBody');
+            
+            if (type === 'tos') {
+                title.textContent = 'Terms of Service';
+                body.innerHTML = tosHTML;
+            } else {
+                title.textContent = 'Privacy Policy';
+                body.innerHTML = privacyHTML;
+            }
+            overlay.style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').style.display = 'none';
+        }
+
+        loadReviews();
+    </script>
+</body>
+</html>
