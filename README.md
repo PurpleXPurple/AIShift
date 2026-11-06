@@ -1,7 +1,3 @@
-Here is a comprehensive, high-quality Markdown document detailing the entire project. You can save this as `README.md` and upload it directly to your Hugging Face repository or include it in your GitHub project.
-
-***
-
 # AISniff: Custom AI Text Detection (ViolentlyPurple/Detect-AI)
 
 ## Overview
